@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # mkgains: Create fake gains
 
 from pyuvdata import UVData, UVCal
@@ -29,7 +29,7 @@ for read in readfuncts:
     except:
         numfailed += 1
     else:
-        print '%s used to read data' % (read.__name__)
+        print('%s used to read data' % (read.__name__))
         break
 
 if numfailed == len(readfuncts):
@@ -76,14 +76,14 @@ minrand = np.random.randint(0, maxrand - 1)
 real = (((maxrand - minrand) * np.random.random(gain_shape)) + minrand)#.astype('complex128')
 imag = (((maxrand - minrand) * np.random.random(gain_shape)) + minrand) * 1j
 gains = real + imag
-print 'min value: %d' % (minrand)
-print 'max value: %d' % (maxrand)
+print('min value: %d' % (minrand))
+print('max value: %d' % (maxrand))
 
 # Preparing variables for transformations
 if args.time:
     lengthsec = np.float64(args.deltaT) / 86400
     size = np.abs(uvc.time_array - (uvc.time_array.min() + lengthsec)).argmin() + 1
-    print 'boxcar size: %d integrations' % (size)
+    print('boxcar size: %d integrations' % (size))
 else:
     size = deltaT
 
@@ -139,5 +139,5 @@ while toappend != 'stop':
         else:
             raise NotImplementedError("Cannot write to location '%s'" % (fullpath))
     else:
-        print "calfits file written to '%s'" % (fullpath + toappend + '.cal')
+        print("calfits file written to '%s'" % (fullpath + toappend + '.cal'))
         toappend = 'stop'
