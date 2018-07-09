@@ -9,15 +9,20 @@ import os
 # Start parsing arguments
 parse = argp.ArgumentParser()
 parse.add_argument("path", help='Path to data file', type=str)
-parse.add_argument('deltaT', help='Number of integrations used for boxcar smoothing', type=int)
-parse.add_argument('f0', help='Minimum frequency to start zeroing out', type=np.float64)
-parse.add_argument('-t', '--time', help='Interprets deltaT as an amount of time (in seconds)' + \
-        ' instead of the amount of integrations', action="store_true")
+parse.add_argument('-i', '--integrations',  help='Number of integrations used for boxcar smoothing', type=int)
+parse.add_argument('-f', '--frequency', help='Minimum frequency to start zeroing out (in Hz)', type=np.float64)
+parse.add_argument('-t', '--time', help='Amount of time (in seconds) used for boxcar smoothing', type=int)
 args = parse.parse_args()
 
 fullpath = os.path.abspath(os.path.expanduser(args.path))
 if fullpath.endswith('/'):
     fullpath = fullpath[:-1]
+
+if bool(args.time) == bool(args.integrations):
+    raise ValueError('Either -i or -t must be used')
+
+if args.frequency == None:
+    raise ValueError('-f must be used')
 
 # Load data
 uvd = UVData()
@@ -35,8 +40,8 @@ for read in readfuncts:
 if numfailed == len(readfuncts):
     raise IOError('Data could not be read using any read function in UVData')
 
-if args.deltaT > uvd.Ntimes and not args.time:
-    raise ValueError('deltaT is too big (Must be <= Ntimes in your data)')
+if args.integrations > uvd.Ntimes and not bool(args.time):
+    raise ValueError('Number of integrations is too big (Must be <= Ntimes in your data)')
 
 # Prepare cal file
 uvc = UVCal()
@@ -71,7 +76,7 @@ if uvc.x_orientation == None:
 # Create random gains
 gain_shape = (uvc.Nants_data, uvc.Nspws, uvc.Nfreqs, uvc.Ntimes, uvc.Njones)
 
-maxrand = np.random.randint(0, 150)
+maxrand = np.random.randint(2, 150)
 minrand = np.random.randint(0, maxrand - 1)
 real = (((maxrand - minrand) * np.random.random(gain_shape)) + minrand)#.astype('complex128')
 imag = (((maxrand - minrand) * np.random.random(gain_shape)) + minrand) * 1j
@@ -81,23 +86,23 @@ print('max value: %d' % (maxrand))
 
 # Preparing variables for transformations
 if args.time:
-    lengthsec = np.float64(args.deltaT) / 86400
+    lengthsec = np.float64(args.time) / 86400
     size = np.abs(uvc.time_array - (uvc.time_array.min() + lengthsec)).argmin() + 1
     print('boxcar size: %d integrations' % (size))
 else:
-    size = deltaT
+    size = args.integrations
 
 if size < 2:
-    raise ValueError('deltaT is too small')
+    raise ValueError('Specificed integraions or time value is too small')
 
 bc = np.zeros(uvc.Ntimes)
-sizeodd = args.deltaT & 1
-radius = args.deltaT / 2
-center = bc.size / 2
+sizeodd = size & 1
+radius = size >> 1
+center = bc.size >> 1
 bc[center - radius:center + radius + sizeodd] = 1
-bc /= np.float64(args.deltaT)
+bc /= np.float64(size)
 
-f0index = np.argmax(uvc.freq_array >= args.f0)
+f0index = np.argmax(uvc.freq_array >= args.frequency)
 if f0index == 0:
     if np.any(np.amin(uvc.freq_array, axis = 0) > args.f0):
         raise ValueError('f0 is too small (f0 must be between freq_array[0] and freq_array[-1])')
@@ -119,8 +124,8 @@ for ant in range(uvc.Nants_data):
                 timefft = np.fft.fft(gains[ant, spw, freq, :, polar], n = uvc.Nfreqs * 2 - 1)
                 bcfft = np.fft.fft(bc, n = uvc.Nfreqs * 2 - 1)
                 smoothed = np.fft.ifft(timefft * bcfft, n = uvc.Nfreqs * 2 - 1)
-                smoothed_center = smoothed.size / 2
-                smoothed_radius = uvc.Ntimes / 2
+                smoothed_center = smoothed.size >> 1
+                smoothed_radius = uvc.Ntimes >> 1
                 gains[ant, spw, freq, :, polar] = smoothed[smoothed_center - smoothed_radius:smoothed_center + smoothed_radius]
 
 uvc.gain_array = gains
