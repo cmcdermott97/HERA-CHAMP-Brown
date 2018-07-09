@@ -86,9 +86,11 @@ print('max value: %d' % (maxrand))
 
 # Preparing variables for transformations
 if args.time:
-    lengthsec = np.float64(args.time) / 86400
-    size = np.abs(uvc.time_array - (uvc.time_array.min() + lengthsec)).argmin() + 1
+    lengthday = np.float64(args.time) / 86400
+    size = np.abs(uvc.time_array - (uvc.time_array.min() + lengthday)).argmin() + 1
     print('boxcar size: %d integrations' % (size))
+    if lengthday + uvc.time_array[0] > uvc.time_range[1]:
+        print('Warning: The given time range is bigger than the time range of the data set')
 else:
     size = args.integrations
 
