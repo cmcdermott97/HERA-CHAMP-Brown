@@ -5,6 +5,8 @@ from pyuvdata import UVData, UVCal
 import numpy as np
 import argparse as argp
 import os
+import sys
+import subprocess as sub
 
 # Start parsing arguments
 parse = argp.ArgumentParser()
@@ -61,7 +63,13 @@ uvc.cal_style = 'redundant'
 uvc.cal_type = 'gain'
 uvc.gain_convention = 'multiply'
 
-uvc.history = ''
+command_given = sys.argv[1:]
+command_given = ["'" + x + "'" if ' ' in x else x for x in command_given]
+command_given = ' '.join(command_given)
+script_path = os.path.dirname(os.path.abspath(__file__))
+git_hash = sub.check_output(['git', '-C', script_path, 'rev-parse', 'HEAD']).strip().decode('UTF-8')
+uvc.history = 'Created using mkgains.py\nCommand run: mkgains.py %s\nmkgains.py Git Hash: %s' % (command_given, git_hash)
+
 uvc.Njones = uvd.Npols
 uvc.jones_array = uvd.polarization_array
 uvc.ant_array = np.arange(uvc.Nants_data)
