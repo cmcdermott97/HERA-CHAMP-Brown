@@ -167,12 +167,6 @@ if f0index == 0:
 for ant in range(uvc.Nants_data):
     for spw in range(uvc.Nspws):
         for polar in range(uvc.Njones):
-            # Fouier space low pass filter
-            for time in range(uvc.Ntimes):
-                freqsfft = np.fft.fft(gains[ant, spw, :, time, polar])
-                freqsfft[f0index:] = 0 + 0j
-                gains[ant, spw, :, time, polar] = np.fft.ifft(freqsfft)
-
             # Boxcar smoothing
             for freq in range(uvc.Nfreqs):
                 timefft = np.fft.fft(gains[ant, spw, freq, :, polar], n = uvc.Nfreqs * 2 - 1)
@@ -181,6 +175,12 @@ for ant in range(uvc.Nants_data):
                 smoothed_center = smoothed.size >> 1
                 smoothed_radius = uvc.Ntimes >> 1
                 gains[ant, spw, freq, :, polar] = smoothed[smoothed_center - smoothed_radius:smoothed_center + smoothed_radius]
+
+            # Fouier space low pass filter
+            for time in range(uvc.Ntimes):
+                freqsfft = np.fft.fft(gains[ant, spw, :, time, polar])
+                freqsfft[f0index:] = 0 + 0j
+                gains[ant, spw, :, time, polar] = np.fft.ifft(freqsfft)
 
 uvc.gain_array = gains
 
