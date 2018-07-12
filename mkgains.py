@@ -59,6 +59,11 @@ for count, check in enumerate([args.realrange, args.imagrange]):
 uvd = UVData()
 readfuncts = [getattr(uvd, n) for n in dir(uvd) if n.startswith('read')]
 numfailed = 0
+# Forced to temporarily dump STDERR to null device
+stderr = os.dup(2)
+null = os.open(os.devnull, os.O_WRONLY)
+os.dup2(null, 2)
+os.close(null)
 for read in readfuncts:
     try:
         read(fullpath)
@@ -68,6 +73,8 @@ for read in readfuncts:
         print('%s used to read data' % (read.__name__))
         break
 
+os.dup2(stderr, 2)
+os.close(stderr)
 if numfailed == len(readfuncts):
     raise IOError('Data could not be read using any read function in UVData')
 
