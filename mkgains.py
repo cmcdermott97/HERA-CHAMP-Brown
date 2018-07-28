@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-# mkgains: Create fake gains
 '''
-
+mkgains.py: Creates fake gains
+This takes some UVData-compatible data file/folder, and creates gains
+based on the shape of the data. It filters the gains in two ways:
+    1: Boxcar filter over # of integrations
+    2: Low pass filter over frequency
+The user must select the size of the boxcar, the size used for the
+low pass filter and the standard deviation of the distribution of the
+gains.
 '''
 from pyuvdata import UVData, UVCal
 import numpy as np
