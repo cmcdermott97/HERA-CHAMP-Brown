@@ -147,7 +147,7 @@ else:
     width = (radius * 2) + sizeodd
 
 if args.freqfourier:
-    sincran = np.linspace(-args.frequency, args.frequnecy, gain_shape[2])
+    sincran = np.linspace(-args.frequency, args.frequency, gain_shape[2])
     freqfilter = np.sinc(sincran * 3.79 / args.frequency)
     freqtransform = freqlowpassFFT
 
