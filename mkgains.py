@@ -16,15 +16,15 @@ import os
 import sys
 import subprocess as sub
 
-def timeboxcarFFT(data, conv, k):
+def timeboxcarFFT(data, conv, width):
     datafft = np.fft.fft(data)
     convfft = np.fft.fft(conv/uvc.Ntimes)
     return np.fft.ifft(datafft * convfft)
 
-def timeboxcarREAL(data, conv, k):
+def timeboxcarREAL(data, conv, width):
     datafft = np.fft.fft(data)
     convfft = np.fft.fft(conv)
-    convfft /= np.max(convfft) * k
+    convfft /= np.max(convfft) * width
     return np.fft.ifft(datafft * convfft)
 
 def freqlowpassFFT(data, conv):
@@ -81,9 +81,6 @@ for read in readfuncts:
 if numfailed == len(readfuncts):
     raise IOError('Data could not be read using any read function in UVData')
 
-if args.integrations > uvd.Ntimes and not bool(args.time):
-    raise ValueError('Number of integrations is too big (Must be <= Ntimes in your data)')
-
 # Prepare cal file
 uvc = UVCal()
 
@@ -123,26 +120,31 @@ if uvc.x_orientation == None:
 # Create random gains
 gain_shape = (uvc.Nants_data, uvc.Nspws, uvc.Nfreqs, uvc.Ntimes, uvc.Njones)
 gains = np.random.normal(1.0, args.ampstdev, gain_shape) * \
-        np.exp(np.random.normal(0.0, args.phasestdev, gain_shape)) 
+        np.exp(np.random.normal(0.0, args.phasestdev, gain_shape) * 1j) 
 
 # Preparing variables for transformations
-timesize = args.time / uvc.integration_time
+timesize = int(args.time / uvc.integration_time)
+if timesize == 0:
+    raise ValueError('--time is too small')
+
 if args.timefourier:
     if timesize > gain_shape[3]:
         raise ValueError('--time is too big')
 
-    sincran = np.linspace(3.79 / k, 3.79 / k, gain_shape[3])
+    sincran = np.linspace(-np.pi * args.time, np.pi * args.time, gain_shape[3])
     timefilter = np.sinc(sincran * timesize)
     timetransform = timeboxcarFFT
+    width = None
 
 else:
     timefilter = np.zeros(uvc.Ntimes)
     sizeodd = timesize & 1
     radius = timesize >> 1
-    center = bc.size >> 1
+    center = timefilter.size >> 1
     timefilter[center - radius:center + radius + sizeodd] = 1
     timefilter /= np.float64(timesize)
     timetransform = timeboxcarREAL
+    width = (radius * 2) + sizeodd
 
 if args.freqfourier:
     sincran = np.linspace(-args.frequency, args.frequnecy, gain_shape[2])
@@ -150,15 +152,15 @@ if args.freqfourier:
     freqtransform = freqlowpassFFT
 
 else:
-    if args.frequency > np.abs(uvc.freq_array[-1] - uvc.freq_array[0]):
+    if args.frequency > np.abs(uvc.freq_array[0, -1] - uvc.freq_array[0, 0]):
         raise ValueError('--frequency is too big')
     
-    freqsize = int(args.frequency / np.abs(uvc.freq_array[-1] - uvc.freq_array[-2])) + 1
-    freqfilter = np.ones(gain_shape[2])
-    if uvc.freq_array[-1] > uvc.freq_array[-2]:
-        freqfilter[-freqsize:] = 0
+    freqsize = int(args.frequency / np.abs(uvc.freq_array[0, -1] - uvc.freq_array[0, -2])) + 1
+    freqfilter = np.ones(gain_shape[2], dtype=complex)
+    if uvc.freq_array[0, -1] > uvc.freq_array[0, -2]:
+        freqfilter[-freqsize:] = 0 + 0j
     else:
-        freqfilter[:freqsize] = 0
+        freqfilter[:freqsize] = 0 + 0j
     freqtransform = freqlowpassREAL
 
 # Transform random gains
@@ -167,7 +169,7 @@ for ant in range(uvc.Nants_data):
         for polar in range(uvc.Njones):
             # Boxcar smoothing
             for freq in range(uvc.Nfreqs):
-                gains[ant, spw, freq, :, polar] = timetranform(gains[ant, spw, freq, :, polar], timefilter)
+                gains[ant, spw, freq, :, polar] = timetransform(gains[ant, spw, freq, :, polar], timefilter, width)
 
             # Fouier space low pass filter
             for time in range(uvc.Ntimes):
@@ -178,7 +180,6 @@ uvc.gain_array = gains
 # Write out calfits file in same directory as data file
 i = 0
 toappend = ''
-
 while toappend != 'stop':
     try:
         uvc.write_calfits(fullpath + toappend + '.cal')
